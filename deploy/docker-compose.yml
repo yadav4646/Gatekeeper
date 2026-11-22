@@ -1,0 +1,101 @@
+# Local stack. Run from the repo root:
+#   docker compose -f deploy/docker-compose.yml up --build
+#
+# M1 wires gateway <-> demo upstreams. MongoDB, Redis, Keycloak and the OTel pipeline
+# are provisioned now so later milestones only add configuration.
+name: gatekeeper
+
+x-node-service: &node-service
+  build:
+    context: ..
+    dockerfile: Dockerfile
+  restart: unless-stopped
+  read_only: true
+  security_opt: ['no-new-privileges:true']
+
+services:
+  gateway:
+    <<: *node-service
+    image: gatekeeper-gateway:dev
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args: { APP: '@gatekeeper/gateway' }
+    environment:
+      GATEKEEPER_CONFIG: /config/gateway.yaml
+      LOG_LEVEL: info
+    volumes:
+      - ../apps/gateway/config/gateway.compose.yaml:/config/gateway.yaml:ro
+    ports:
+      - '127.0.0.1:8080:8080'
+    depends_on:
+      demo-crm: { condition: service_healthy }
+      demo-files: { condition: service_healthy }
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8080/healthz']
+      interval: 5s
+      timeout: 2s
+      retries: 10
+
+  demo-crm:
+    <<: *node-service
+    image: gatekeeper-demo-servers:dev
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args: { APP: '@gatekeeper/demo-servers' }
+    environment: { DEMO: crm, PORT: '9101', HOST: 0.0.0.0 }
+    healthcheck: &demo-health
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:$$PORT/healthz']
+      interval: 3s
+      timeout: 2s
+      retries: 10
+
+  demo-files:
+    <<: *node-service
+    image: gatekeeper-demo-servers:dev
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args: { APP: '@gatekeeper/demo-servers' }
+    environment: { DEMO: files, PORT: '9102', HOST: 0.0.0.0 }
+    healthcheck: *demo-health
+
+  mongo:
+    image: mongo:8.0
+    restart: unless-stopped
+    volumes: [mongo-data:/data/db]
+    ports: ['127.0.0.1:27017:27017']
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--save', '', '--appendonly', 'no']
+    ports: ['127.0.0.1:6379:6379']
+
+  keycloak:
+    image: keycloak/keycloak:26.0
+    command: ['start-dev', '--import-realm']
+    environment:
+      # Local development credentials only. Never reuse outside this compose file.
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import:ro
+    ports: ['127.0.0.1:8081:8080']
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    command: ['--config=/etc/otelcol/config.yaml']
+    volumes:
+      - ./otel/collector.yaml:/etc/otelcol/config.yaml:ro
+    ports: ['127.0.0.1:4317:4317', '127.0.0.1:4318:4318']
+    depends_on: [jaeger]
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    environment: { COLLECTOR_OTLP_ENABLED: 'true' }
+    ports: ['127.0.0.1:16686:16686']
+
+volumes:
+  mongo-data:
