@@ -1,0 +1,21 @@
+# Local development config. Upstreams move to the MongoDB registry in M3.
+listen:
+  host: 127.0.0.1
+  port: 8080
+
+allowedHosts: [localhost, 127.0.0.1, '[::1]']
+allowedOrigins: [localhost, 127.0.0.1, '[::1]']
+
+# Demo upstreams run on plain http inside the local network only.
+allowInsecureUpstreams: true
+
+catalog:
+  minTtlMs: 5000
+  maxTtlMs: 300000
+  defaultTtlMs: 30000
+
+upstreams:
+  - slug: crm
+    url: http://127.0.0.1:9101/mcp
+  - slug: files
+    url: http://127.0.0.1:9102/mcp
