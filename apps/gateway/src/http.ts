@@ -38,6 +38,7 @@ export function createGatewayHttp(
       createGatewayServer({
         catalog,
         hooks,
+        era: ctx.era,
         caller: {
           ...(ctx.authInfo ? { authInfo: ctx.authInfo } : {}),
           ...(ctx.requestInfo ? { request: ctx.requestInfo } : {}),

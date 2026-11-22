@@ -60,6 +60,29 @@ agent ──POST /mcp──▶ Host/Origin check ─▶ SDK edge: era, MCP-Proto
 - **Hop hygiene.** Upstream identity (`_meta` serverInfo) and addresses never reach the
   client; unknown and (from M2) denied tools both answer `-32602 Unknown tool`.
 
+## Client compatibility
+
+The gateway serves both protocol eras on the same `/mcp` endpoint and always speaks
+2026-07-28 to its upstreams, so older clients get the same routing and checks.
+
+| Client                                 | Protocol it speaks        | Status                         |
+| -------------------------------------- | ------------------------- | ------------------------------ |
+| MCP TypeScript SDK v2 (`pin` / `auto`) | 2026-07-28 (stateless)    | Tested (`tests/contract`)      |
+| MCP TypeScript SDK v2, default mode    | 2025-11-25 (`initialize`) | Tested (`tests/contract`)      |
+| MCP TypeScript SDK v1 (1.32.2)         | 2025-11-25 (`initialize`) | Tested (`tests/contract`)      |
+| MCP Inspector 2.16.0 (`--cli`)         | 2025-11-25 (`initialize`) | Verified manually: list + call |
+| Raw 2025-03-26 / 2025-06-18 requests   | `initialize` per revision | Tested (`tests/bypass`)        |
+
+2025-era clients are served statelessly: no `Mcp-Session-Id` is minted, the standalone
+GET stream answers `405`, and server-initiated requests are never sent. Upstreams that
+still speak the 2025 spec are not supported yet (planned for M5).
+
+Try the Inspector yourself:
+
+```bash
+npx @modelcontextprotocol/inspector@2.16.0 --cli http://localhost:8080/mcp --transport http --method tools/list
+```
+
 ## Layout
 
 | Path                    | What                                                        |

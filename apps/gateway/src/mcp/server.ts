@@ -9,6 +9,11 @@ export interface GatewayServerDeps {
   catalog: Catalog;
   hooks: GatewayHooks;
   caller: CallerContext;
+  /**
+   * Protocol era of the inbound request. 2026-07-28 (`modern`) results carry cache hints;
+   * 2025-era (`legacy`) results must not carry 2026-only fields.
+   */
+  era: 'modern' | 'legacy';
   now?: () => number;
 }
 
@@ -22,7 +27,13 @@ const INSTRUCTIONS =
  * The low-level `Server` is used (not `McpServer`) because the tool table is dynamic:
  * it is the merged, filtered upstream catalogue, not tools registered in code.
  */
-export function createGatewayServer({ catalog, hooks, caller, now = Date.now }: GatewayServerDeps): Server {
+export function createGatewayServer({
+  catalog,
+  hooks,
+  caller,
+  era,
+  now = Date.now,
+}: GatewayServerDeps): Server {
   const server = new Server(
     { ...GATEWAY_INFO },
     { capabilities: { tools: { listChanged: false } }, instructions: INSTRUCTIONS },
@@ -40,6 +51,7 @@ export function createGatewayServer({ catalog, hooks, caller, now = Date.now }: 
         tools.push({ ...entry.value.tool, name: entry.exposedName });
       }
     }
+    if (era === 'legacy') return { tools };
     return {
       tools,
       ttlMs: catalog.remainingTtl(snap),

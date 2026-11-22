@@ -44,6 +44,18 @@ check "Mcp-Name mismatch -> 400/-32020"     400 '"code":-32020' \
   "$(rpc tools/call '"name":"crm__delete_customer","arguments":{"id":"c-001"}' crm__read_customer)"
 check "server/discover"                      200 '"supportedVersions"' "$(rpc server/discover '')"
 
+# 2025-era client: initialize handshake, then a plain tools/list (no _meta, no mirroring).
+legacy() { # legacy <json-body> [protocol-version-header]
+  local args=(-s -w '\n%{http_code}' "$GATEWAY/mcp"
+    -H 'content-type: application/json' -H 'accept: application/json, text/event-stream')
+  [[ -n "${2:-}" ]] && args+=(-H "mcp-protocol-version: $2")
+  curl "${args[@]}" -d "$1"
+}
+check "legacy initialize (2025-11-25)"       200 '"serverInfo":{"name":"gatekeeper"' \
+  "$(legacy '{"jsonrpc":"2.0","id":10,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"smoke","version":"0"}}}')"
+check "legacy tools/list"                    200 '"crm__read_customer"' \
+  "$(legacy '{"jsonrpc":"2.0","id":11,"method":"tools/list","params":{}}' 2025-11-25)"
+
 status="$(curl -s -o /dev/null -w '%{http_code}' "$GATEWAY/mcp")"
 [[ "$status" == 405 ]] && echo "PASS  GET /mcp -> 405" || { echo "FAIL  GET /mcp -> $status"; fail=1; }
 

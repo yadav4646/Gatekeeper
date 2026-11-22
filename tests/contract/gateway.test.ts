@@ -1,6 +1,14 @@
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { GATEWAY_URL, MODERN, createHarness, modernRequest, readRpc, type Harness } from '../harness.js';
+import {
+  GATEWAY_URL,
+  MODERN,
+  createHarness,
+  gatewayFetch,
+  modernRequest,
+  readRpc,
+  type Harness,
+} from '../harness.js';
 
 let h: Harness;
 beforeEach(() => {
@@ -168,17 +176,7 @@ describe('SDK client end to end', () => {
       { name: 'e2e', version: '0.0.0' },
       { versionNegotiation: { mode: { pin: MODERN } } },
     );
-    await client.connect(
-      new StreamableHTTPClientTransport(new URL(GATEWAY_URL), {
-        // A real HTTP client always sends Host; the in-process Request does not.
-        fetch: (input, init) => {
-          const req = new Request(input, init);
-          const headers = new Headers(req.headers);
-          headers.set('host', new URL(req.url).host);
-          return h.gateway.http.fetch(new Request(req, { headers }));
-        },
-      }),
-    );
+    await client.connect(new StreamableHTTPClientTransport(new URL(GATEWAY_URL), { fetch: gatewayFetch(h) }));
     expect(client.getProtocolEra()).toBe('modern');
     expect(client.getServerVersion()?.name).toBe('gatekeeper');
 

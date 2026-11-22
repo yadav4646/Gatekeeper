@@ -156,3 +156,24 @@ export async function readRpc(response: Response): Promise<JsonRpcReply | undefi
   }
   return JSON.parse(text) as JsonRpcReply;
 }
+
+/**
+ * fetch for SDK clients pointed at the in-process gateway. A real HTTP client always
+ * sends Host; an in-process Request does not, and the gateway's DNS-rebinding check
+ * requires it.
+ */
+export function gatewayFetch(h: Harness) {
+  return (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+    const req = new Request(input, init);
+    const headers = new Headers(req.headers);
+    headers.set('host', new URL(req.url).host);
+    return h.gateway.http.fetch(new Request(req, { headers }));
+  };
+}
+
+/** Upstream tools/call requests seen so far. */
+export function upstreamCalls(h: Harness): RecordedUpstreamRequest[] {
+  return h.upstreamRequests.filter(
+    (r) => (r.body as { method?: string } | undefined)?.method === 'tools/call',
+  );
+}
